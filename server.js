@@ -290,7 +290,7 @@ app.post("/api/adminLogin", async (req, res) => {
 app.get("/", async (req, res) => {
   try {
     res.send({
-      message: "Hello World",
+      url: 'https://ikhofiphezulu.web.app/'
     });
   } catch (error) {
     console.log(error);
