@@ -14,6 +14,8 @@ const CoffeeModel = require("./models/Coffee");
 const User = require("./models/User");
 const Admin = require("./models/Admin");
 const sendText = require("./clickSendApi");
+// const runConnection = require("./helperFunctions")
+const coffeeObject = require("./helperFunctions");
 
 // const bodyParser = require("body-parser");
 app.use(express.json());
@@ -37,7 +39,7 @@ mongoose.connect(
 );
 
 const mongoUri = `mongodb+srv://${process.env.MONGO_ACC}:${process.env.MONGO_PW}@cluster0.nv1odnc.mongodb.net/coffee_orders?retryWrites=true&w=majority`;
-const client = new MongoClient(mongoUri, {
+const mongoClient = new MongoClient(mongoUri, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
@@ -45,8 +47,10 @@ const client = new MongoClient(mongoUri, {
   },
 });
 
-const clientCollection = client.db("coffee_orders").collection('white_coffees')
-const changeStream = clientCollection.watch()
+const clientCollection = mongoClient
+  .db("coffee_orders")
+  .collection("white_coffees");
+const changeStream = clientCollection.watch();
 // Socket io
 
 io.on("connection", (socket) => {
@@ -58,10 +62,10 @@ io.on("connection", (socket) => {
     console.log(data);
   });
 
-  changeStream.on('Change', (change) => {
+  changeStream.on("Change", (change) => {
     const message = JSON.stringify(change);
-    socket.broadcast.emit('Change', message)
-  })
+    socket.broadcast.emit("Change", message);
+  });
 
   socket.on("Order Complete", (data) => {
     socket.broadcast.emit("Update", data);
@@ -75,12 +79,12 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {});
 });
 
-async function run() {
+async function runConnection() {
   try {
     // connect client to the server
-    await client.connect();
+    await mongoClient.connect();
     // send a ping to confirm success
-    await client.db("admin").command({ ping: 1 });
+    await mongoClient.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You Connected successfully to MongoDb",
     );
@@ -90,7 +94,8 @@ async function run() {
     // client.close();
   }
 }
-run().catch(console.dir);
+
+runConnection().catch(console.dir);
 
 // View orders
 app.get("/api/view-orders", async (req, res) => {
@@ -107,24 +112,17 @@ app.get("/api/view-orders", async (req, res) => {
 
 // CREATE COFFEE ORDER ROUTE
 app.post("/api/coffee", async (req, res) => {
-  // Create a test here to make sure that
-  // What is returned is what is intended and not malicious
-  // Turn this into a function
-  const name = req.body.name;
-  const number = req.body.number;
-  const coffeeName = req.body.coffeeName;
-  const coffeeMilk = req.body.coffeeMilk;
-  const coffeeSize = req.body.coffeeSize;
-  // const email = req.body.email;
-
+  const Ikhofi = coffeeObject(req);
   const coffee = new CoffeeModel({
-    name: name,
+    // Ikhofi
+    name: Ikhofi.person,
     // email: email,
-    number: number,
-    coffeeName: coffeeName,
-    coffeeMilk: coffeeMilk,
-    coffeeSize: coffeeSize,
+    number: Ikhofi.number,
+    coffeeName: Ikhofi.coffeeName,
+    coffeeMilk: Ikhofi.coffeeMilk,
+    coffeeSize: Ikhofi.coffeeSize,
   });
+  console.log(coffee);
   try {
     const saved = coffee.save();
     await saved.then((response) => {
@@ -137,23 +135,13 @@ app.post("/api/coffee", async (req, res) => {
 
 // DELETE COFFEE FROM DATABASE ROUTE
 app.post("/api/sendCoffee", async (req, res) => {
-  // Turn this into a function
-  const coffee = {
-    name: req.body.name,
-    number: req.body.number,
-    coffeeName: req.body.coffeeName,
-    coffeeSize: req.body.coffeeSize,
-    coffeeMilk: req.body.coffeeMilk,
-  };
+  const Ikhofi = coffeeObject(req);
   try {
-    const result = sendText(coffee.number, coffee.coffeeName);
+    const result = sendText(Ikhofi.number, Ikhofi.coffeeName);
     result.then((data) => {
       if (data.response_code === "SUCCESS") {
-        console.log(`Text message success`)
-         const test = CoffeeModel.deleteOne(
-          coffee,
-        );
-      return test
+        const test = CoffeeModel.deleteOne(Ikhofi);
+        return test;
       }
     });
   } catch (error) {
@@ -163,7 +151,6 @@ app.post("/api/sendCoffee", async (req, res) => {
 
 // Register
 app.post("/api/register", async (req, res) => {
-
   const bcryptPassword = await bcrypt.hash(req.body.password, 10);
   const bcryptEmail = await bcrypt.hash(req.body.email, 13);
   const bcryptNumber = await bcrypt.hash(req.body.mobileNumber, 15);
@@ -185,7 +172,6 @@ app.post("/api/register", async (req, res) => {
 
 // LOGIN ROUTE
 app.post("/api/login", async (req, res) => {
-
   const userFound = await User.findOne({
     email: req.body.email,
   });
@@ -238,7 +224,6 @@ app.get("/api/user-data", async (req, res) => {
   }
 });
 */
-
 
 /*
 Update user data, not being used at the moment 
