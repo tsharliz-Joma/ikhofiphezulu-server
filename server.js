@@ -289,7 +289,7 @@ app.post("/api/adminLogin", async (req, res) => {
 
 app.get("/", async (req, res) => {
   try {
-    res.json({
+    res.send({
       message: "Hello World",
     });
   } catch (error) {
