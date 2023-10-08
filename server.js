@@ -287,10 +287,10 @@ app.post("/api/adminLogin", async (req, res) => {
   }
 });
 
-app.get("/", async (req, res) => {
+app.get("/https://ikhofiphezulu.web.app/", async (req, res) => {
   try {
-    res.send({
-      url: 'https://ikhofiphezulu.web.app/'
+    res.json({
+      message: 'Hello World'
     });
   } catch (error) {
     console.log(error);
