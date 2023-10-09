@@ -25,7 +25,9 @@ app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:3000"],
+    origin: [
+      "https://ikhkofiphezulu-server-411e98c28af0.herokuapp.com",
+    ],
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -59,7 +61,6 @@ io.on("connection", (socket) => {
 
   socket.on("user_active", (data) => {
     socket.join(data);
-    console.log(data);
   });
 
   changeStream.on("Change", (change) => {
@@ -76,7 +77,9 @@ io.on("connection", (socket) => {
     socket.broadcast.emit("order incoming", data);
   });
 
-  socket.on("disconnect", () => {});
+  socket.on("disconnect", () => {
+    console.log("Websocket disconnected")
+  });
 });
 
 async function runConnection() {
