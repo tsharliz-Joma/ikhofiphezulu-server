@@ -28,7 +28,7 @@ const io = new Server(server, {
     origin: [
       "https://ikhkofiphezulu-server-411e98c28af0.herokuapp.com",
     ],
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   },
 });
