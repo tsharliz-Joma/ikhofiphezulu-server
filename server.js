@@ -25,8 +25,8 @@ app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: ["https://ikhofiphezulu.web.app/"],
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    origin: ["https://ikhofiphezulu.web.app"],
+    methods: ["GET", "POST"],
     credentials: true,
   },
 });
