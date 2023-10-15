@@ -1,41 +1,56 @@
-
-
+const User = require("./models/User");
+const bcrypt = require("bcryptjs");
 
 const coffeeObject = (req) => {
   const ikhofi = {
-    person: req.body.name,
+    name: req.body.name,
     number: req.body.number,
     coffeeName: req.body.coffeeName,
-    coffeeMilk: req.body.coffeeMilk,
+    // coffeeMilk: req.body.coffeeMilk,
     coffeeSize: req.body.coffeeSize,
-    getValues(){
-      return  {
-        person: this.name,
+    getValues() {
+      return {
+        name: this.name,
         number: this.number,
-        coffee: this.coffeeName,
-        milk: this.coffeeMilk,
-        size: this.coffeeSize
-      }
-    }
-  }
-  return ikhofi
-}
+        coffeeName: this.coffeeName,
+        // coffeeMilk: this.coffeeMilk,
+        coffeeSize: this.coffeeSize,
+      };
+    },
+  };
+  return ikhofi;
+};
 
-// async function runConnection() {
-//   try {
-//     // connect client to the server
-//     await client.connect();
-//     // send a ping to confirm success
-//     await client.db("admin").command({ ping: 1 });
-//     console.log(
-//       "Pinged your deployment. You Connected successfully to MongoDb",
-//     );
-//   } finally {
-//     // Ensure the client will close when finished or an error occurs
-//     // I have to turn this off, it causes and error with the collection.watch
-//     // client.close();
-//   }
-// }
+const encrypt = async (req, len) => {
+  const encryptedInfo = {
+    bcryptPassword: req.body.password,
+    bcryptEmail: req.body.email,
+    bcryptNumber: req.body.mobileNumber,
+    async encryptData() {
+      return {
+        bcryptPassword: await bcrypt.hash(this.bcryptPassword, len),
+        bcryptEmail: await bcrypt.hash(this.bcryptEmail, len),
+        bcryptNumber: await bcrypt.hash(this.bcryptNumber, len),
+      };
+    },
+  };
+  return await encryptedInfo.encryptData();
+};
 
-module.exports = coffeeObject
+const decrypt = async (req, user) => {
+  const validatedInfo = {
+    email: req.body.email,
+    password: req.body.password,
+    async compareValues() {
+      return {
+        email: await bcrypt.compare(this.email, user.hashedEmail),
+        password: await bcrypt.compare(this.password, user.password),
+      };
+    },
+  };
+  return await validatedInfo.compareValues();
+};
 
+
+
+module.exports = { coffeeObject, encrypt, decrypt };

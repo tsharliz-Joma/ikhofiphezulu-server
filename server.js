@@ -15,9 +15,8 @@ const User = require("./models/User");
 const Admin = require("./models/Admin");
 const sendText = require("./clickSendApi");
 // const runConnection = require("./helperFunctions")
-const coffeeObject = require("./helperFunctions");
-
-// const bodyParser = require("body-parser");
+const { decrypt, encrypt, coffeeObject } = require("./helperFunctions");
+const bodyParser = require("body-parser");
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
@@ -25,58 +24,60 @@ app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: ["https://ikhofiphezulu.web.app"],
+    origin: ["https://ikhofiphezulu.web.app", "http://localhost:3000"],
     methods: ["GET", "POST"],
     credentials: true,
   },
 });
-
+const mongoUri = `mongodb+srv://${process.env.MONGO_ACC}:${process.env.MONGO_PW}@cluster0.nv1odnc.mongodb.net/coffee_orders?retryWrites=true&w=majority`;
 mongoose.connect(
-  `mongodb+srv://${process.env.MONGO_ACC}:${process.env.MONGO_PW}@cluster0.nv1odnc.mongodb.net/coffee_orders?retryWrites=true&w=majority`,
+  mongoUri,
   {
     useNewUrlParser: true,
   },
 );
 
-const mongoUri = `mongodb+srv://${process.env.MONGO_ACC}:${process.env.MONGO_PW}@cluster0.nv1odnc.mongodb.net/coffee_orders?retryWrites=true&w=majority`;
 const mongoClient = new MongoClient(mongoUri, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
+    useUnifiedTopology: true,
   },
 });
 
-const clientCollection = mongoClient
-  .db("coffee_orders")
-  .collection("white_coffees");
-const changeStream = clientCollection.watch();
+
 // Socket io
 
 io.on("connection", (socket) => {
   console.log(`Socket id: ${socket.id}`);
   console.log(`Socket handshake: ${socket.handshake.headers.origin}`);
 
-  socket.on("user_active", (data) => {
-    socket.join(data);
+  const clientCollection = mongoClient
+    .db("coffee_orders")
+    .collection("white_coffees");
+  const changeStream = clientCollection.watch();
+
+  changeStream.on("insert", (change) => {
+    const message = JSON.stringify(change.fullDocument);
+    socket.broadcast.emit("new order", message);
   });
 
-  changeStream.on("Change", (change) => {
-    const message = JSON.stringify(change);
-    socket.broadcast.emit("Change", message);
-  });
-
-  socket.on("Order Complete", (data) => {
-    socket.broadcast.emit("Update", data);
+  socket.on("order complete", (data) => {
+    socket.broadcast.emit("update", data);
     console.log(data);
   });
 
-  socket.on("new_order", (data) => {
-    socket.broadcast.emit("order incoming", data);
-  });
+  // socket.on("new order", (data) => {
+  //   socket.broadcast.emit("order incoming", data);
+  // });
+
+  // socket.on("user_active", (data) => {
+  //   socket.join(data);
+  // });
 
   socket.on("disconnect", () => {
-    console.log("Websocket disconnected")
+    console.log("Websocket disconnected");
   });
 });
 
@@ -102,10 +103,8 @@ runConnection().catch(console.dir);
 app.get("/api/view-orders", async (req, res) => {
   const token = req.headers["x-access-token"];
   try {
-    await CoffeeModel.find({}).then((res) => {
-      orders = res;
-    });
-    return res.json({ status: "ok", orders: orders });
+    const ordersFound = await CoffeeModel.find({});
+    return res.json({ status: "ok", orders: ordersFound });
   } catch (error) {
     return res.json({ status: "error", error: "No Coffee Orders" });
   }
@@ -114,16 +113,7 @@ app.get("/api/view-orders", async (req, res) => {
 // CREATE COFFEE ORDER ROUTE
 app.post("/api/coffee", async (req, res) => {
   const Ikhofi = coffeeObject(req);
-  const coffee = new CoffeeModel({
-    // Ikhofi
-    name: Ikhofi.person,
-    // email: email,
-    number: Ikhofi.number,
-    coffeeName: Ikhofi.coffeeName,
-    coffeeMilk: Ikhofi.coffeeMilk,
-    coffeeSize: Ikhofi.coffeeSize,
-  });
-  console.log(coffee);
+  const coffee = new CoffeeModel(Ikhofi);
   try {
     const saved = coffee.save();
     await saved.then((response) => {
@@ -141,8 +131,8 @@ app.post("/api/sendCoffee", async (req, res) => {
     const result = sendText(Ikhofi.number, Ikhofi.coffeeName);
     result.then((data) => {
       if (data.response_code === "SUCCESS") {
-        const test = CoffeeModel.deleteOne(Ikhofi);
-        return test;
+        const deleteFromDb = CoffeeModel.deleteOne(Ikhofi);
+        return deleteFromDb;
       }
     });
   } catch (error) {
@@ -152,21 +142,17 @@ app.post("/api/sendCoffee", async (req, res) => {
 
 // Register
 app.post("/api/register", async (req, res) => {
-  const bcryptPassword = await bcrypt.hash(req.body.password, 10);
-  const bcryptEmail = await bcrypt.hash(req.body.email, 13);
-  const bcryptNumber = await bcrypt.hash(req.body.mobileNumber, 15);
-
+  const data = await encrypt(req, 13);
   try {
     await User.create({
       name: req.body.name,
-      hashedEmail: bcryptEmail,
+      hashedEmail: data.bcryptEmail,
       email: req.body.email,
       number: req.body.mobileNumber,
-      password: bcryptPassword,
+      password: data.bcryptPassword,
     });
     res.json({ status: "ok" });
   } catch (err) {
-    console.log(err);
     res.json({ status: "error", error: "Duplicate email." });
   }
 });
@@ -183,18 +169,10 @@ app.post("/api/login", async (req, res) => {
       error: "No Account Found under these credentials",
     };
   }
+  
+  const data = await decrypt(req, userFound);
 
-  const emailValid = await bcrypt.compare(
-    req.body.email,
-    userFound.hashedEmail,
-  );
-
-  const passwordValid = await bcrypt.compare(
-    req.body.password,
-    userFound.password,
-  );
-
-  if (passwordValid && emailValid) {
+  if (data.email && data.password) {
     const token = jwt.sign(
       {
         name: userFound.name,
@@ -203,7 +181,6 @@ app.post("/api/login", async (req, res) => {
       },
       process.env.SUPASECRET,
     );
-
     return res.json({ status: "ok", user: token });
   } else {
     return res.json({ status: "error", user: false });

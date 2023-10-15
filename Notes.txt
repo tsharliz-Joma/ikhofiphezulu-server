@@ -1,0 +1,27 @@
+# Object getter/setter
+
+if you function relies on another value that will take time to load
+Eg.
+`
+const encrypt = async (req, len) => {
+  const encryptedInfo = {
+    bcryptPassword: req.body.password,
+    bcryptEmail: req.body.email,
+    bcryptNumber: req.body.mobileNumber,
+    async encryptData() {
+      return {
+        bcryptPassword: await bcrypt.hash(this.bcryptPassword, len),
+        bcryptEmail: await bcrypt.hash(this.bcryptEmail, len),
+        bcryptNumber: await bcrypt.hash(this.bcryptNumber, len),
+      };
+    },
+  };
+  return await encryptedInfo.encryptData();
+};
+`
+Make the entire function async, then in your setter function in this case
+{encrytData}, that also needs to be an async function as it is going to wait for a response from the
+bcrypt library, the values that you wait to return will need to {await} the completion of the function that 
+you are calling on them , in this case the function is {bcrypt.compare}
+you then need to {await} the return of the object.function(), { await encryptedInfo.encryptData() }, this 
+ensures that all the values are returned , correctly after the need functions have been run and returned
