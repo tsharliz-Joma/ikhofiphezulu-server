@@ -24,7 +24,11 @@ app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: ["https://ikhofiphezulu.web.app", "http://localhost:3000"],
+    origin: [
+      "https://ikhofiphezulu.web.app",
+      "http://localhost:3000",
+      "https://ikhkofiphezulu-server-411e98c28af0.herokuapp.com/",
+    ],
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -144,13 +148,7 @@ app.post("/api/sendCoffee", async (req, res) => {
 app.post("/api/register", async (req, res) => {
   const data = await encrypt(req, 13);
   try {
-    await User.create({
-      name: req.body.name,
-      hashedEmail: data.bcryptEmail,
-      email: req.body.email,
-      number: req.body.mobileNumber,
-      password: data.bcryptPassword,
-    });
+    await User.create(data);
     res.json({ status: "ok" });
   } catch (err) {
     res.json({ status: "error", error: "Duplicate email." });

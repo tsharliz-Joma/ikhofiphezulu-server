@@ -6,28 +6,32 @@ const coffeeObject = (req) => {
     name: req.body.name,
     number: req.body.number,
     coffeeName: req.body.coffeeName,
-    // coffeeMilk: req.body.coffeeMilk,
+    coffeeMilk: req.body.coffeeMilk,
     coffeeSize: req.body.coffeeSize,
     getValues() {
       return {
         name: this.name,
         number: this.number,
         coffeeName: this.coffeeName,
-        // coffeeMilk: this.coffeeMilk,
+        coffeeMilk: this.coffeeMilk,
         coffeeSize: this.coffeeSize,
       };
     },
   };
-  return ikhofi;
+  return ikhofi.getValues();
 };
 
 const encrypt = async (req, len) => {
   const encryptedInfo = {
-    bcryptPassword: req.body.password,
+    name: req.body.name,
     bcryptEmail: req.body.email,
+    email: req.body.email,
+    bcryptPassword: req.body.password,
     bcryptNumber: req.body.mobileNumber,
     async encryptData() {
       return {
+        name: this.name,
+        email: this.email,
         bcryptPassword: await bcrypt.hash(this.bcryptPassword, len),
         bcryptEmail: await bcrypt.hash(this.bcryptEmail, len),
         bcryptNumber: await bcrypt.hash(this.bcryptNumber, len),
