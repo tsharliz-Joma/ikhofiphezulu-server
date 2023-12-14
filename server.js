@@ -14,6 +14,8 @@ const CoffeeModel = require("./models/Coffee");
 const User = require("./models/User");
 const Admin = require("./models/Admin");
 const sendText = require("./clickSendApi");
+const sendTeamsMessage = require("./teamsSendApi")
+const getToken = require("./teamsSendApi")
 // const runConnection = require("./helperFunctions")
 const { decrypt, encrypt, coffeeObject } = require("./helperFunctions");
 const bodyParser = require("body-parser");
@@ -117,6 +119,7 @@ app.get("/api/view-orders", async (req, res) => {
 // CREATE COFFEE ORDER ROUTE
 app.post("/api/coffee", async (req, res) => {
   const Ikhofi = coffeeObject(req);
+  console.log(Ikhofi)
   const coffee = new CoffeeModel(Ikhofi);
   try {
     const saved = coffee.save();
@@ -130,12 +133,17 @@ app.post("/api/coffee", async (req, res) => {
 
 // DELETE COFFEE FROM DATABASE ROUTE
 app.post("/api/sendCoffee", async (req, res) => {
+  // const token = getToken()
   const Ikhofi = coffeeObject(req);
+  console.log(Ikhofi)
   try {
+    // sendTeamsMessage(token, Ikhofi.userId)
     const result = sendText(Ikhofi.number, Ikhofi.coffeeName);
+    console.log(result)
     result.then((data) => {
       if (data.response_code === "SUCCESS") {
         const deleteFromDb = CoffeeModel.deleteOne(Ikhofi);
+        console.log(deleteFromDb)
         return deleteFromDb;
       }
     });

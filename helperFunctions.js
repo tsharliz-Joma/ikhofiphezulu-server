@@ -5,16 +5,20 @@ const coffeeObject = (req) => {
   const ikhofi = {
     name: req.body.name,
     number: req.body.number,
+    email: req.body.email,
     coffeeName: req.body.coffeeName,
     coffeeMilk: req.body.coffeeMilk,
     coffeeSize: req.body.coffeeSize,
+    userId: req.body.userId,
     getValues() {
       return {
         name: this.name,
         number: this.number,
+        email: this.email,
         coffeeName: this.coffeeName,
         coffeeMilk: this.coffeeMilk,
         coffeeSize: this.coffeeSize,
+        userId: this.userId,
       };
     },
   };
