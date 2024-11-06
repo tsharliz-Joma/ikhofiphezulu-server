@@ -29,7 +29,7 @@ const io = new Server(server, {
     origin: [
       "https://ikhofiphezulu.web.app",
       "http://localhost:3000",
-      "https://ikhkofiphezulu-server-411e98c28af0.herokuapp.com/",
+      "https://ikhofiphezulu-server-19652a0dabe7.herokuapp.com/",
     ],
     methods: ["GET", "POST"],
     credentials: true,
@@ -56,9 +56,6 @@ const mongoClient = new MongoClient(mongoUri, {
 // Socket io
 
 io.on("connection", (socket) => {
-  console.log(`Socket id: ${socket.id}`);
-  console.log(`Socket handshake: ${socket.handshake.headers.origin}`);
-
   const clientCollection = mongoClient
     .db("coffee_orders")
     .collection("white_coffees");
@@ -73,14 +70,6 @@ io.on("connection", (socket) => {
     socket.broadcast.emit("update", data);
     console.log(data);
   });
-
-  // socket.on("new order", (data) => {
-  //   socket.broadcast.emit("order incoming", data);
-  // });
-
-  // socket.on("user_active", (data) => {
-  //   socket.join(data);
-  // });
 
   socket.on("disconnect", () => {
     console.log("Websocket disconnected");
@@ -119,7 +108,6 @@ app.get("/api/view-orders", async (req, res) => {
 // CREATE COFFEE ORDER ROUTE
 app.post("/api/coffee", async (req, res) => {
   const Ikhofi = coffeeObject(req);
-  console.log(Ikhofi)
   const coffee = new CoffeeModel(Ikhofi);
   try {
     const saved = coffee.save();
@@ -135,11 +123,9 @@ app.post("/api/coffee", async (req, res) => {
 app.post("/api/sendCoffee", async (req, res) => {
   // const token = getToken()
   const Ikhofi = coffeeObject(req);
-  console.log(Ikhofi)
   try {
     // sendTeamsMessage(token, Ikhofi.userId)
     const result = sendText(Ikhofi.number, Ikhofi.coffeeName);
-    console.log(result)
     result.then((data) => {
       if (data.response_code === "SUCCESS") {
         const deleteFromDb = CoffeeModel.deleteOne(Ikhofi);
