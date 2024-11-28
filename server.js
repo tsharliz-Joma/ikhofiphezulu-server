@@ -14,9 +14,8 @@ const CoffeeModel = require("./models/Coffee");
 const User = require("./models/User");
 const Admin = require("./models/Admin");
 const sendText = require("./clickSendApi");
-const sendTeamsMessage = require("./teamsSendApi")
-const getToken = require("./teamsSendApi")
-// const runConnection = require("./helperFunctions")
+const sendTeamsMessage = require("./teamsSendApi");
+const getToken = require("./teamsSendApi");
 const { decrypt, encrypt, coffeeObject } = require("./helperFunctions");
 const bodyParser = require("body-parser");
 app.use(express.json());
@@ -36,12 +35,9 @@ const io = new Server(server, {
   },
 });
 const mongoUri = `mongodb+srv://${process.env.MONGO_ACC}:${process.env.MONGO_PW}@cluster0.nv1odnc.mongodb.net/coffee_orders?retryWrites=true&w=majority`;
-mongoose.connect(
-  mongoUri,
-  {
-    useNewUrlParser: true,
-  },
-);
+mongoose.connect(mongoUri, {
+  useNewUrlParser: true,
+});
 
 const mongoClient = new MongoClient(mongoUri, {
   serverApi: {
@@ -52,23 +48,22 @@ const mongoClient = new MongoClient(mongoUri, {
   },
 });
 
-
 // Socket io
-
 io.on("connection", (socket) => {
-  const clientCollection = mongoClient
-    .db("coffee_orders")
-    .collection("white_coffees");
+  const clientCollection = mongoClient.db("coffee_orders").collection("white_coffees");
   const changeStream = clientCollection.watch();
 
-  changeStream.on("insert", (change) => {
-    const message = JSON.stringify(change.fullDocument);
-    socket.broadcast.emit("new order", message);
+  changeStream.on("change", (change) => {
+    console.log("Insert Detectd:", change);
+
+    if (change.operationType === "insert") {
+      const order = change.fullDocument;
+      socket.emit("new order", order);
+    }
   });
 
   socket.on("order complete", (data) => {
-    socket.broadcast.emit("update", data);
-    console.log(data);
+    socket.emit("update", data);
   });
 
   socket.on("disconnect", () => {
@@ -82,9 +77,7 @@ async function runConnection() {
     await mongoClient.connect();
     // send a ping to confirm success
     await mongoClient.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You Connected successfully to MongoDb",
-    );
+    console.log("Pinged your deployment. You Connected successfully to MongoDb");
   } finally {
     // Ensure the client will close when finished or an error occurs
     // I have to turn this off, it causes and error with the collection.watch
@@ -94,14 +87,37 @@ async function runConnection() {
 
 runConnection().catch(console.dir);
 
-// View orders
-app.get("/api/view-orders", async (req, res) => {
+// ViEW ORDERS ROUTE
+app.get("/api/orders", async (req, res) => {
   const token = req.headers["x-access-token"];
   try {
-    const ordersFound = await CoffeeModel.find({});
-    return res.json({ status: "ok", orders: ordersFound });
+    const orders = await CoffeeModel.find({});
+    if (orders.length === 0) {
+      return res.json({ status: "error", error: "No Coffee Orders" });
+    } else {
+      return res.json({ status: "ok", orders: orders });
+    }
   } catch (error) {
-    return res.json({ status: "error", error: "No Coffee Orders" });
+    return res.json({ status: "error", error: "Error" });
+  }
+});
+
+// UPDATE ORDER STATUS ROUTE
+app.post("/api/orders/updateStatus", async (req, res) => {
+  const { orderId, newStatus } = req.body;
+
+  try {
+    const updated = await CoffeeModel.updateOne({ _id: orderId }, { $set: { status: newStatus } });
+
+    if (updated.modifiedCount > 0) {
+      socket.broadcast.emit("order status update", { orderId, status: newStatus });
+      res.json({ status: "ok", message: "Order status updated" });
+    } else {
+      res.status(404).json({ status: "error", message: "Order not found" });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: "error", message: error.message });
   }
 });
 
@@ -110,12 +126,11 @@ app.post("/api/coffee", async (req, res) => {
   const Ikhofi = coffeeObject(req);
   const coffee = new CoffeeModel(Ikhofi);
   try {
-    const saved = coffee.save();
-    await saved.then((response) => {
-      return res.json({ status: "ok" });
-    });
+    const saved = await coffee.save();
+    return res.json({ status: "ok", coffee: saved });
   } catch (error) {
-    return error;
+    console.error(error);
+    return res.status(500).json({ status: "error", message: error.message });
   }
 });
 
@@ -125,11 +140,10 @@ app.post("/api/sendCoffee", async (req, res) => {
   const Ikhofi = coffeeObject(req);
   try {
     // sendTeamsMessage(token, Ikhofi.userId)
-    const result = sendText(Ikhofi.number, Ikhofi.coffeeName);
+    // const result = sendText(Ikhofi.number, Ikhofi.coffeeName);
     result.then((data) => {
       if (data.response_code === "SUCCESS") {
         const deleteFromDb = CoffeeModel.deleteOne(Ikhofi);
-        console.log(deleteFromDb)
         return deleteFromDb;
       }
     });
@@ -138,7 +152,7 @@ app.post("/api/sendCoffee", async (req, res) => {
   }
 });
 
-// Register
+// REGISTER ROUTE
 app.post("/api/register", async (req, res) => {
   const data = await encrypt(req, 13);
   try {
@@ -154,16 +168,13 @@ app.post("/api/login", async (req, res) => {
   const userFound = await User.findOne({
     email: req.body.email,
   });
-
   if (!userFound) {
     return {
       status: "error",
       error: "No Account Found under these credentials",
     };
   }
-  
   const data = await decrypt(req, userFound);
-
   if (data.email && data.password) {
     const token = jwt.sign(
       {
@@ -171,8 +182,9 @@ app.post("/api/login", async (req, res) => {
         email: userFound.email,
         number: userFound.number,
       },
-      process.env.SUPASECRET,
+      process.env.SUPASECRET
     );
+
     return res.json({ status: "ok", user: token });
   } else {
     return res.json({ status: "error", user: false });
@@ -249,7 +261,7 @@ app.post("/api/adminLogin", async (req, res) => {
       {
         name: adminFound.user,
       },
-      process.env.SUPASECRET,
+      process.env.SUPASECRET
     );
     return res.json({ status: "ok", user: token });
   } else {
