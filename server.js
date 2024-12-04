@@ -246,16 +246,22 @@ app.post("/api/adminRegistration", async (req, res) => {
 });
 */
 
+app.post(`/api/adminDashboard`, async (req, res) => {
+  try {
+    return res.json({ status: "ok" }, { passwordValid: true });
+  } catch (error) {
+    console.error(error);
+  }
+});
+
 app.post("/api/adminLogin", async (req, res) => {
   const adminFound = await Admin.findOne({
-    user: req.body.user,
+    email: req.body.email,
   });
-
   if (!adminFound) {
-    return { status: "error", error: "Incorrect Admin Credentials" };
+    return res.json({ status: "error", error: "Incorrect Admin Credentials" });
   }
-
-  const passwordValid = await bcrypt.compare(req.body.pwd, adminFound.pwd);
+  const passwordValid = await bcrypt.compare(req.body.password, adminFound.pwd);
   if (passwordValid) {
     const token = jwt.sign(
       {
