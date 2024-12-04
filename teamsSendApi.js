@@ -24,7 +24,6 @@ const getToken = async () => {
     });
 
     const accessToken = response.data.accessToken;
-    console.log("Access Token", accessToken);
     return accessToken;
   } catch (error) {
     console.error(`Error getting access token:`, error.response.data);
@@ -32,10 +31,7 @@ const getToken = async () => {
   }
 };
 
-
-
 const sendTeamsMessage = async (accessToken, userId, message) => {
-
   const headers = {
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
@@ -56,11 +52,10 @@ const sendTeamsMessage = async (accessToken, userId, message) => {
     const response = await axios.post(teamsApiEndpoint, requestBody, {
       headers,
     });
-    console.log(`Message send successfully`, response.data);
   } catch (error) {
     console.error(`Error sending message to Teams`, error.response.data);
     throw new Error(`Failed to send message to Teams`);
   }
 };
 
-module.exports = sendTeamsMessage, getToken;
+(module.exports = sendTeamsMessage), getToken;

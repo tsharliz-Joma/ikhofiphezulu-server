@@ -54,8 +54,6 @@ io.on("connection", (socket) => {
   const changeStream = clientCollection.watch();
 
   changeStream.on("change", (change) => {
-    console.log("Insert Detectd:", change);
-
     if (change.operationType === "insert") {
       const order = change.fullDocument;
       socket.emit("new order", order);
@@ -148,7 +146,7 @@ app.post("/api/sendCoffee", async (req, res) => {
       }
     });
   } catch (error) {
-    console.log(error);
+    console.error(error);
   }
 });
 
@@ -281,7 +279,7 @@ app.get("/", async (req, res) => {
       message: "Hello World",
     });
   } catch (error) {
-    console.log(error);
+    console.error(error);
   }
 });
 

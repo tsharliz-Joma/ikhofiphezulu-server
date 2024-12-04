@@ -46,7 +46,6 @@ module.exports = () => {
 
     socket.on("order complete", (data) => {
       socket.emit("update", data);
-      console.log(data);
     });
 
     socket.on("disconnect", () => {
