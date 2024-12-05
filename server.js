@@ -1,7 +1,6 @@
 require("dotenv").config({ path: "./config.env" });
-require("dotenv").config({ path: "./.env.dev" });
+require("dotenv").config({ path: "./env.dev" });
 const express = require("express");
-const app = express();
 const cors = require("cors");
 const http = require("http");
 const PORT = process.env.PORT || 1969;
@@ -16,8 +15,23 @@ const Admin = require("./models/Admin");
 const sendText = require("./clickSendApi");
 const sendTeamsMessage = require("./teamsSendApi");
 const getToken = require("./teamsSendApi");
-const { decrypt, encrypt, coffeeObject } = require("./helperFunctions");
+const { decrypt, encrypt, coffeeObject, verifyToken } = require("./helperFunctions");
 const bodyParser = require("body-parser");
+const { body, validationResult } = require("express-validator");
+const rateLimit = require("express-rate-limit");
+const app = express();
+const limiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 100,
+  message: "Too many requests from this IP, please try again after 30 minutes",
+});
+const adminLoginLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 5, // Limit each IP to 5 login attempts per window
+  message: "Too many login attempts. Please try again later.",
+});
+
+app.use(limiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
@@ -34,9 +48,10 @@ const io = new Server(server, {
     credentials: true,
   },
 });
-const mongoUri = `mongodb+srv://${process.env.MONGO_ACC}:${process.env.MONGO_PW}@cluster0.nv1odnc.mongodb.net/coffee_orders?retryWrites=true&w=majority`;
+
+const mongoUri = process.env.MONGO_URI;
 mongoose.connect(mongoUri, {
-  useNewUrlParser: true,
+  useUnifiedTopology: true,
 });
 
 const mongoClient = new MongoClient(mongoUri, {
@@ -61,11 +76,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("order complete", (data) => {
-    socket.emit("update", data);
+    socket.broadcast.emit("update", data);
   });
 
   socket.on("disconnect", () => {
-    console.log("Websocket disconnected");
+    console.log("Client disconnected");
   });
 });
 
@@ -87,7 +102,6 @@ runConnection().catch(console.dir);
 
 // ViEW ORDERS ROUTE
 app.get("/api/orders", async (req, res) => {
-  const token = req.headers["x-access-token"];
   try {
     const orders = await CoffeeModel.find({});
     if (orders.length === 0) {
@@ -96,7 +110,8 @@ app.get("/api/orders", async (req, res) => {
       return res.json({ status: "ok", orders: orders });
     }
   } catch (error) {
-    return res.json({ status: "error", error: "Error" });
+    console.error(error);
+    return res.status(500).json({ status: "error", error: "Error Fetching Orders" });
   }
 });
 
@@ -108,7 +123,7 @@ app.post("/api/orders/updateStatus", async (req, res) => {
     const updated = await CoffeeModel.updateOne({ _id: orderId }, { $set: { status: newStatus } });
 
     if (updated.modifiedCount > 0) {
-      socket.broadcast.emit("order status update", { orderId, status: newStatus });
+      io.emit("order status update", { orderId, status: newStatus });
       res.json({ status: "ok", message: "Order status updated" });
     } else {
       res.status(404).json({ status: "error", message: "Order not found" });
@@ -162,87 +177,51 @@ app.post("/api/register", async (req, res) => {
 });
 
 // LOGIN ROUTE
-app.post("/api/login", async (req, res) => {
-  const userFound = await User.findOne({
-    email: req.body.email,
-  });
-  if (!userFound) {
-    return {
-      status: "error",
-      error: "No Account Found under these credentials",
-    };
-  }
-  const data = await decrypt(req, userFound);
-  if (data.email && data.password) {
-    const token = jwt.sign(
-      {
-        name: userFound.name,
-        email: userFound.email,
-        number: userFound.number,
-      },
-      process.env.SUPASECRET
-    );
+app.post(
+  "/api/login",
+  limiter,
+  [
+    body("email").isEmail().withMessage("InValid email format"),
+    body("password").isLength({ min: 6 }).withMessage("Password must be at least 6 characters"),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.json({ status: "error", error: errors.array() });
+    }
 
-    return res.json({ status: "ok", user: token });
-  } else {
-    return res.json({ status: "error", user: false });
-  }
-});
+    try {
+      const userFound = await User.findOne({
+        email: req.body.email,
+      });
 
-/*
-View User Data - Not being used yet
-app.get("/api/user-data", async (req, res) => {
-  const token = req.headers["x-access-token"];
-  try {
-    const decoded = jwt.verify(token, process.env.SUPASECRET);
-    const email = decoded.email;
-    const user = await User.findOne({ email: email });
-    return res.json({ status: "ok", name: user.name });
-  } catch (error) {
-    res.json({ status: "error", error: "invalid token'" });
-    console.log(error);
+      if (!userFound) {
+        res
+          .status(404)
+          .json({ status: "error", error: "No account found under these credentials" });
+      }
+      const data = await decrypt(req, userFound);
+      if (data.email && data.password) {
+        const token = jwt.sign(
+          {
+            name: userFound.name,
+            email: userFound.email,
+            number: userFound.number,
+          },
+          process.env.JWT_SECRET
+          // { expiresIn: "9h" }
+        );
+        console.log(token);
+        return res.json({ status: "ok", user: token });
+      } else {
+        return res.json({ status: "error", user: false });
+      }
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ status: "error", message: error.message });
+    }
   }
-});
-*/
-
-/*
-Update user data, not being used at the moment 
-app.post("/api/user-data", async (req, res) => {
-  const token = req.headers["x-access-token"];
-  try {
-    const decoded = jwt.verify(token, process.env.SUPASECRET);
-    const email = decoded.email;
-    await User.updateOne({ email: email }, { $set: { name: req.body.name } });
-    return res.json({ status: "ok " });
-  } catch (error) {
-    // console.log(error)
-    return res.json({ status: "error", error: "invalid token" });
-  }
-});
-*/
-
-/*
-// MONGO ACCOUNT REGISTRATION - Not being used yet
-app.post("/api/adminRegistration", async (req, res) => {
-  console.log(req.body);
-  // const newAdmin = new Admin({
-  //     user: req.body.name ,
-  //     pwd: req.body.password
-  // });
-  try {
-    const bcryptPassword = await bcrypt.hash(req.body.pwd, 10);
-    await Admin.create({
-      user: req.body.name,
-      admin: true,
-      pwd: bcryptPassword,
-    });
-    res.json({ status: "ok " });
-  } catch (error) {
-    console.log(error);
-    res.json({ status: "error", error: "Duplicate email." });
-  }
-});
-*/
+);
 
 app.post(`/api/adminDashboard`, async (req, res) => {
   try {
@@ -252,26 +231,48 @@ app.post(`/api/adminDashboard`, async (req, res) => {
   }
 });
 
-app.post("/api/adminLogin", async (req, res) => {
-  const adminFound = await Admin.findOne({
-    email: req.body.email,
-  });
-  if (!adminFound) {
-    return res.json({ status: "error", error: "Incorrect Admin Credentials" });
+app.post(
+  "/api/adminLogin",
+  adminLoginLimiter,
+  [
+    body("email").isEmail().withMessage("Invalid email format"),
+    body("password").isLength({ min: 6 }).withMessage("Password must be at least 6 characters"),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty) {
+      return res.status(500).json({ status: "error", errors: errors.array() });
+    }
+
+    try {
+      const admin = await Admin.findOne({
+        email: req.body.email,
+      });
+      if (!admin) {
+        return res.status(404).json({ status: "error", error: "Incorrect Credentials" });
+      }
+      const isPasswordValid = await bcrypt.compare(req.body.password, admin.pwd);
+      if (!isPasswordValid) {
+        return res.status(404).json({ status: "error", error: "Incorrect Credentials" });
+      }
+      const token = jwt.sign(
+        {
+          id: admin._id,
+          name: admin.user,
+          email: admin.email,
+          isAdmin: admin.admin,
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "7.5h" }
+      );
+
+      return res.json({ status: "ok", user: token });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ status: "error", message: error.message });
+    }
   }
-  const passwordValid = await bcrypt.compare(req.body.password, adminFound.pwd);
-  if (passwordValid) {
-    const token = jwt.sign(
-      {
-        name: adminFound.user,
-      },
-      process.env.SUPASECRET
-    );
-    return res.json({ status: "ok", user: token });
-  } else {
-    return res.json({ status: "error", user: false });
-  }
-});
+);
 
 app.get("/", async (req, res) => {
   try {

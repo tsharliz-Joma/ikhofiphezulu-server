@@ -1,3 +1,4 @@
+const { verify } = require("crypto");
 const User = require("./models/User");
 const bcrypt = require("bcryptjs");
 
@@ -59,6 +60,17 @@ const decrypt = async (req, user) => {
   return await validatedInfo.compareValues();
 };
 
+const verifyToken = (req, res, next) => {
+  const token = req.header("admin-access-token");
+  if (!token) return res.status(403).json({ status: "error", message: "Access Denied" });
+  console.log(token);
+  try {
+    const verified = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = verified;
+    next();
+  } catch (error) {
+    res.status(401).json({ status: "error", message: "Invalid Token" });
+  }
+};
 
-
-module.exports = { coffeeObject, encrypt, decrypt };
+module.exports = { coffeeObject, encrypt, decrypt, verifyToken };
