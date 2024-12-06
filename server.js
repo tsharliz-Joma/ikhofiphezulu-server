@@ -19,24 +19,57 @@ const { decrypt, encrypt, coffeeObject, verifyToken } = require("./helperFunctio
 const bodyParser = require("body-parser");
 const { body, validationResult } = require("express-validator");
 const rateLimit = require("express-rate-limit");
+const mongoSanitize = require("express-mongo-sanitize");
+const winston = require("winston");
+const helmet = require("helmet");
+const xxs = require("xss-clean");
+const hpp = require("hpp");
+
 const app = express();
+const server = http.createServer(app);
+
+const logger = winston.createLogger({
+  level: "info",
+  format: winston.format.json(),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: "error.log", level: "error" }),
+  ],
+});
+
 const limiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 100,
   message: "Too many requests from this IP, please try again after 30 minutes",
 });
+
 const adminLoginLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
   max: 5, // Limit each IP to 5 login attempts per window
   message: "Too many login attempts. Please try again later.",
+  handler: (req, res) => {
+    logger.warn`Rate limit exceeded for IP: ${req.ip}`;
+    res
+      .status(429)
+      .json({ status: "error", message: "Too many login attempts. Please try again later." });
+  },
 });
 
 app.use(limiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(mongoSanitize()); // Prevent NoSQL injection
+app.use(xxs()); // Prevent XSS attacks
+app.use(helmet()); // Secure HTTP headers
+app.use(hpp()); // Prevent HTTP param pollution
 app.use(cors());
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  next();
+});
 
-const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: [
@@ -50,9 +83,12 @@ const io = new Server(server, {
 });
 
 const mongoUri = process.env.MONGO_URI;
-mongoose.connect(mongoUri, {
-  useUnifiedTopology: true,
-});
+mongoose
+  .connect(mongoUri, {
+    useUnifiedTopology: true,
+  })
+  .then(() => logger.info("Connected to MongoDB"))
+  .catch((err) => logger.error(`Error connecting to MongoDB: ${err}`));
 
 const mongoClient = new MongoClient(mongoUri, {
   serverApi: {
@@ -65,6 +101,7 @@ const mongoClient = new MongoClient(mongoUri, {
 
 // Socket io
 io.on("connection", (socket) => {
+  logger.info("Client connected");
   const clientCollection = mongoClient.db("coffee_orders").collection("white_coffees");
   const changeStream = clientCollection.watch();
 
@@ -80,7 +117,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log("Client disconnected");
+    logger.info("Client disconnected");
   });
 });
 
@@ -121,7 +158,6 @@ app.post("/api/orders/updateStatus", async (req, res) => {
 
   try {
     const updated = await CoffeeModel.updateOne({ _id: orderId }, { $set: { status: newStatus } });
-
     if (updated.modifiedCount > 0) {
       io.emit("order status update", { orderId, status: newStatus });
       res.json({ status: "ok", message: "Order status updated" });
@@ -208,10 +244,9 @@ app.post(
             email: userFound.email,
             number: userFound.number,
           },
-          process.env.JWT_SECRET
-          // { expiresIn: "9h" }
+          process.env.JWT_SECRET,
+          { expiresIn: process.env.TOKEN_EXPIRY || "7h" }
         );
-        console.log(token);
         return res.json({ status: "ok", user: token });
       } else {
         return res.json({ status: "error", user: false });
@@ -263,7 +298,7 @@ app.post(
           isAdmin: admin.admin,
         },
         process.env.JWT_SECRET,
-        { expiresIn: "7.5h" }
+        { expiresIn: process.env.TOKEN_EXPIRY || "7h" }
       );
 
       return res.json({ status: "ok", user: token });
@@ -284,6 +319,18 @@ app.get("/", async (req, res) => {
   }
 });
 
+app.use((err, req, res, next) => {
+  logger.error(`[Error]: ${err.message}`, {
+    method: req.method,
+    path: req.originalUrl,
+    ip: req.ip,
+  });
+  res.status(err.statusCode || 500).json({
+    status: "error",
+    message: err.isOperational ? err.message : "Somthing went wrong",
+  });
+});
+
 server.listen(PORT, () => {
-  console.log(`Server Listening on port ${PORT}`);
+  logger.info(`Server is running on port ${PORT}`);
 });
