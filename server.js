@@ -1,4 +1,3 @@
-
 require("dotenv").config({ path: "./config.env" });
 require("dotenv").config({ path: "./env.dev" });
 const express = require("express");
@@ -41,6 +40,15 @@ const limiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 100,
   message: "Too many requests from this IP, please try again after 30 minutes",
+  handler: (req, res) => {
+    logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
+    res
+      .status(429)
+      .json({
+        status: "error",
+        message: "Too many requests from this IP, please try again after 30 minutes",
+      });
+  },
 });
 
 const adminLoginLimiter = rateLimit({
@@ -48,7 +56,7 @@ const adminLoginLimiter = rateLimit({
   max: 5, // Limit each IP to 5 login attempts per window
   message: "Too many login attempts. Please try again later.",
   handler: (req, res) => {
-    logger.warn`Rate limit exceeded for IP: ${req.ip}`;
+    logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
     res
       .status(429)
       .json({ status: "error", message: "Too many login attempts. Please try again later." });
@@ -262,7 +270,8 @@ app.post(`/api/adminDashboard`, async (req, res) => {
   try {
     return res.json({ status: "ok" }, { passwordValid: true });
   } catch (error) {
-    console.error(error);
+    logger.error(`[Error]: ${error.message}`, { route: "/api/adminDashboard" });
+    res.status(500).json({ status: "error", message: "Internal Server Error" });
   }
 });
 
