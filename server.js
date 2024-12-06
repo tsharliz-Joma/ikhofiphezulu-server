@@ -1,3 +1,4 @@
+
 require("dotenv").config({ path: "./config.env" });
 require("dotenv").config({ path: "./env.dev" });
 const express = require("express");
@@ -15,8 +16,7 @@ const Admin = require("./models/Admin");
 const sendText = require("./clickSendApi");
 const sendTeamsMessage = require("./teamsSendApi");
 const getToken = require("./teamsSendApi");
-const { decrypt, encrypt, coffeeObject, verifyToken } = require("./helperFunctions");
-const bodyParser = require("body-parser");
+const { decrypt, encrypt, coffeeObject } = require("./helperFunctions");
 const { body, validationResult } = require("express-validator");
 const rateLimit = require("express-rate-limit");
 const mongoSanitize = require("express-mongo-sanitize");
@@ -185,19 +185,19 @@ app.post("/api/coffee", async (req, res) => {
 
 // DELETE COFFEE FROM DATABASE ROUTE
 app.post("/api/sendCoffee", async (req, res) => {
-  // const token = getToken()
   const Ikhofi = coffeeObject(req);
   try {
     // sendTeamsMessage(token, Ikhofi.userId)
-    // const result = sendText(Ikhofi.number, Ikhofi.coffeeName);
-    result.then((data) => {
-      if (data.response_code === "SUCCESS") {
-        const deleteFromDb = CoffeeModel.deleteOne(Ikhofi);
-        return deleteFromDb;
-      }
-    });
+    const data = await sendText(Ikhofi.number, Ikhofi.coffeeName);
+    if (data.response_code === "SUCCESS") {
+      await CoffeeModel.deleteOne(Ikhofi);
+      res.json({ status: "ok", message: "Coffee sent and deleted" });
+    } else {
+      res.status(400).json({ status: "error", message: "Failed to send coffee" });
+    }
   } catch (error) {
-    console.error(error);
+    logger.error(error);
+    res.status(500).json({ status: "error", message: error.message });
   }
 });
 
