@@ -1,5 +1,7 @@
 require("dotenv").config({ path: "./config.env" });
-var api = require("clicksend/api.js'");
+var api = require("clicksend");
+
+console.log(api);
 
 var smsMessage = new api.SmsMessage();
 
