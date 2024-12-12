@@ -13,8 +13,6 @@ const CoffeeModel = require("./models/Coffee");
 const User = require("./models/User");
 const Admin = require("./models/Admin");
 const sendText = require("./clickSendApi");
-const sendTeamsMessage = require("./teamsSendApi");
-const getToken = require("./teamsSendApi");
 const { decrypt, encrypt, coffeeObject } = require("./helperFunctions");
 const { body, validationResult } = require("express-validator");
 const rateLimit = require("express-rate-limit");
@@ -23,7 +21,9 @@ const winston = require("winston");
 const helmet = require("helmet");
 const xxs = require("xss-clean");
 const hpp = require("hpp");
-
+const StripeRouter = require("./routes/stripe");
+const AuthRouter = require("./routes/auth");
+const AdminRouter = require("./routes/admin");
 const app = express();
 const server = http.createServer(app);
 
@@ -42,12 +42,10 @@ const limiter = rateLimit({
   message: "Too many requests from this IP, please try again after 30 minutes",
   handler: (req, res) => {
     logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
-    res
-      .status(429)
-      .json({
-        status: "error",
-        message: "Too many requests from this IP, please try again after 30 minutes",
-      });
+    res.status(429).json({
+      status: "error",
+      message: "Too many requests from this IP, please try again after 30 minutes",
+    });
   },
 });
 
@@ -62,6 +60,8 @@ const adminLoginLimiter = rateLimit({
       .json({ status: "error", message: "Too many login attempts. Please try again later." });
   },
 });
+
+module.exports = { adminLoginLimiter };
 
 app.use(limiter);
 app.use(express.json());
@@ -82,7 +82,6 @@ const io = new Server(server, {
   cors: {
     origin: [
       "https://ikhofiphezulu.web.app",
-      "http://localhost:3000",
       "https://ikhofiphezulu-server-19652a0dabe7.herokuapp.com/",
     ],
     methods: ["GET", "POST"],
@@ -145,6 +144,10 @@ async function runConnection() {
 
 runConnection().catch(console.dir);
 
+app.use("/api/stripe", StripeRouter);
+app.use("/api", AuthRouter);
+app.use("/api", AdminRouter);
+
 // ViEW ORDERS ROUTE
 app.get("/api/orders", async (req, res) => {
   try {
@@ -157,6 +160,36 @@ app.get("/api/orders", async (req, res) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ status: "error", error: "Error Fetching Orders" });
+  }
+});
+
+// CREATE ORDER ROUTE
+app.post("/api/orders", async (req, res) => {
+  const Ikhofi = coffeeObject(req);
+  const coffee = new CoffeeModel(Ikhofi);
+  try {
+    const saved = await coffee.save();
+    return res.json({ status: "ok", coffee: saved });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ status: "error", message: error.message });
+  }
+});
+
+// SEND TEXT and DELETE ORDER ROUTE
+app.post("/api/completeOrder", async (req, res) => {
+  const Ikhofi = coffeeObject(req);
+  try {
+    const data = await sendText(Ikhofi.number, Ikhofi.coffeeName);
+    if (data.response_code === "SUCCESS") {
+      await CoffeeModel.deleteOne(Ikhofi);
+      res.json({ status: "ok", message: "Coffee sent and deleted" });
+    } else {
+      res.status(400).json({ status: "error", message: "Failed to send coffee" });
+    }
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ status: "error", message: error.message });
   }
 });
 
@@ -178,38 +211,7 @@ app.post("/api/orders/updateStatus", async (req, res) => {
   }
 });
 
-// CREATE COFFEE ORDER ROUTE
-app.post("/api/coffee", async (req, res) => {
-  const Ikhofi = coffeeObject(req);
-  const coffee = new CoffeeModel(Ikhofi);
-  try {
-    const saved = await coffee.save();
-    return res.json({ status: "ok", coffee: saved });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ status: "error", message: error.message });
-  }
-});
-
-// DELETE COFFEE FROM DATABASE ROUTE
-app.post("/api/sendCoffee", async (req, res) => {
-  const Ikhofi = coffeeObject(req);
-  try {
-    // sendTeamsMessage(token, Ikhofi.userId)
-    const data = await sendText(Ikhofi.number, Ikhofi.coffeeName);
-    if (data.response_code === "SUCCESS") {
-      await CoffeeModel.deleteOne(Ikhofi);
-      res.json({ status: "ok", message: "Coffee sent and deleted" });
-    } else {
-      res.status(400).json({ status: "error", message: "Failed to send coffee" });
-    }
-  } catch (error) {
-    logger.error(error);
-    res.status(500).json({ status: "error", message: error.message });
-  }
-});
-
-// REGISTER ROUTE
+// register account route
 app.post("/api/register", async (req, res) => {
   const data = await encrypt(req, 13);
   try {
@@ -220,7 +222,7 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-// LOGIN ROUTE
+// login route
 app.post(
   "/api/login",
   limiter,
@@ -266,6 +268,7 @@ app.post(
   }
 );
 
+// Admin dashboard route
 app.post(`/api/adminDashboard`, async (req, res) => {
   try {
     return res.json({ status: "ok" }, { passwordValid: true });
@@ -274,49 +277,6 @@ app.post(`/api/adminDashboard`, async (req, res) => {
     res.status(500).json({ status: "error", message: "Internal Server Error" });
   }
 });
-
-app.post(
-  "/api/adminLogin",
-  adminLoginLimiter,
-  [
-    body("email").isEmail().withMessage("Invalid email format"),
-    body("password").isLength({ min: 6 }).withMessage("Password must be at least 6 characters"),
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty) {
-      return res.status(500).json({ status: "error", errors: errors.array() });
-    }
-
-    try {
-      const admin = await Admin.findOne({
-        email: req.body.email,
-      });
-      if (!admin) {
-        return res.status(404).json({ status: "error", error: "Incorrect Credentials" });
-      }
-      const isPasswordValid = await bcrypt.compare(req.body.password, admin.pwd);
-      if (!isPasswordValid) {
-        return res.status(404).json({ status: "error", error: "Incorrect Credentials" });
-      }
-      const token = jwt.sign(
-        {
-          id: admin._id,
-          name: admin.user,
-          email: admin.email,
-          isAdmin: admin.admin,
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.TOKEN_EXPIRY || "7h" }
-      );
-
-      return res.json({ status: "ok", user: token });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ status: "error", message: error.message });
-    }
-  }
-);
 
 app.get("/", async (req, res) => {
   try {
