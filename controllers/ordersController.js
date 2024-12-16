@@ -1,6 +1,6 @@
 const CoffeeModel = require("../models/Coffee");
-import sendText from "../clickSendApi";
-import { coffeeObject } from "../helperFunctions";
+const sendText = require("../clickSendApi");
+const coffeeObject = require("../helperFunctions");
 
 const viewOrders = async (req, res) => {
   try {

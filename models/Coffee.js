@@ -27,9 +27,9 @@ const CoffeeSchema = new mongoose.Schema(
       required: false,
     },
   },
-  { collection: "white_coffees" }
+  { collection: "orders" }
 );
 
-const Coffee = mongoose.model("white_coffees", CoffeeSchema);
+const Coffee = mongoose.model("orders", CoffeeSchema);
 
 module.exports = Coffee;

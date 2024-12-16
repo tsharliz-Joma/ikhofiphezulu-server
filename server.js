@@ -24,6 +24,8 @@ const hpp = require("hpp");
 const StripeRouter = require("./routes/stripe");
 const AuthRouter = require("./routes/auth");
 const AdminRouter = require("./routes/admin");
+const PasswordRouter = require("./routes/password");
+const { initializePassword } = require("./passwordManager");
 const app = express();
 const server = http.createServer(app);
 
@@ -83,6 +85,7 @@ const io = new Server(server, {
     origin: [
       "https://ikhofiphezulu.web.app",
       "https://ikhofiphezulu-server-19652a0dabe7.herokuapp.com/",
+      "http://localhost:3000",
     ],
     methods: ["GET", "POST"],
     credentials: true,
@@ -109,7 +112,7 @@ const mongoClient = new MongoClient(mongoUri, {
 // Socket io
 io.on("connection", (socket) => {
   logger.info("Client connected");
-  const clientCollection = mongoClient.db("coffee_orders").collection("white_coffees");
+  const clientCollection = mongoClient.db("coffeeup").collection("orders");
   const changeStream = clientCollection.watch();
 
   changeStream.on("change", (change) => {
@@ -147,6 +150,7 @@ runConnection().catch(console.dir);
 app.use("/api/stripe", StripeRouter);
 app.use("/api", AuthRouter);
 app.use("/api", AdminRouter);
+app.use("/api", PasswordRouter);
 
 // ViEW ORDERS ROUTE
 app.get("/api/orders", async (req, res) => {
@@ -300,6 +304,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   logger.info(`Server is running on port ${PORT}`);
+  await initializePassword();
 });
