@@ -11,6 +11,6 @@ const MilkInventorySchema = new mongoose.Schema({
     }
 })
 
-const MilkInventory = mongoose.model("milk-inventory", MilkInventorySchema);
+const MilkInventory = mongoose.model("inventory", MilkInventorySchema);
 
 module.exports =  MilkInventory;
