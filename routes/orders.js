@@ -1,15 +1,15 @@
 const express = require("express");
 const {
   viewOrders,
-  updateOrder,
-  sendOrder,
+  updateStatus,
+  completeOrder,
   createOrder,
 } = require("../controllers/ordersController");
 const OrderRouter = express.Router();
 
 OrderRouter.get("/orders", viewOrders);
 OrderRouter.post("/orders", createOrder);
-OrderRouter.post("/orders/updateStatus", updateOrder);
-OrderRouter.post("/completeOrder", sendOrder);
+OrderRouter.post("/orders/updateStatus", updateStatus);
+OrderRouter.post("/completeOrder", completeOrder);
 
 module.exports = OrderRouter;

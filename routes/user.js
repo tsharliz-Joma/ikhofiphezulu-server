@@ -1,14 +1,14 @@
 const express = require("express");
-const { register, login, adminLogin } = require("../controllers/authController");
+const { register, login } = require("../controllers/userController");
 const { body } = require("express-validator");
-const adminLoginLimiter = require("../server");
-const AuthRouter = express.Router();
+const { limiter } = require("../winston.js");
+const userRouter = express.Router();
 
+userRouter.use(limiter);
 // Register Route
-AuthRouter.post("/register", register);
-
+userRouter.post("/register", register);
 // Login Route
-AuthRouter.post(
+userRouter.post(
   "/login",
   [
     body("email").isEmail().withMessage("Invalid email format"),
@@ -17,4 +17,4 @@ AuthRouter.post(
   login
 );
 
-module.exports = AuthRouter;
+module.exports = userRouter;

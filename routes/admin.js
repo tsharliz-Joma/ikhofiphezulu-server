@@ -1,9 +1,10 @@
 const express = require("express");
-const { body } = require("express-validator");
 const { adminLogin } = require("../controllers/adminController");
-const { adminLoginLimiter } = require("../server");
+const { body } = require("express-validator");
+const { adminLimiter } = require("../winston.js");
 const AdminRouter = express.Router();
 
+AdminRouter.use(adminLimiter);
 // Admin Login Route
 AdminRouter.post(
   "/adminLogin",

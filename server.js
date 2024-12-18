@@ -5,65 +5,27 @@ const cors = require("cors");
 const http = require("http");
 const PORT = process.env.PORT || 1969;
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
 const { Server } = require("socket.io");
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const mongoose = require("mongoose");
-const CoffeeModel = require("./models/Coffee");
 const User = require("./models/User");
-const Admin = require("./models/Admin");
-const sendText = require("./clickSendApi");
-const { decrypt, encrypt, coffeeObject } = require("./helperFunctions");
+const { decrypt, encrypt } = require("./helperFunctions");
 const { body, validationResult } = require("express-validator");
-const rateLimit = require("express-rate-limit");
 const mongoSanitize = require("express-mongo-sanitize");
-const winston = require("winston");
+
 const helmet = require("helmet");
 const xxs = require("xss-clean");
 const hpp = require("hpp");
 const StripeRouter = require("./routes/stripe");
-const AuthRouter = require("./routes/auth");
+const UserRouter = require("./routes/user");
 const AdminRouter = require("./routes/admin");
 const PasswordRouter = require("./routes/password");
+const OrderRouter = require("./routes/orders");
 const { initializePassword } = require("./passwordManager");
 const app = express();
 const server = http.createServer(app);
-
-const logger = winston.createLogger({
-  level: "info",
-  format: winston.format.json(),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: "error.log", level: "error" }),
-  ],
-});
-
-const limiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 100,
-  message: "Too many requests from this IP, please try again after 30 minutes",
-  handler: (req, res) => {
-    logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
-    res.status(429).json({
-      status: "error",
-      message: "Too many requests from this IP, please try again after 30 minutes",
-    });
-  },
-});
-
-const adminLoginLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 5, // Limit each IP to 5 login attempts per window
-  message: "Too many login attempts. Please try again later.",
-  handler: (req, res) => {
-    logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
-    res
-      .status(429)
-      .json({ status: "error", message: "Too many login attempts. Please try again later." });
-  },
-});
-
-module.exports = { adminLoginLimiter };
+const { limiter } = require("./winston");
+const { logger } = require("./winston");
 
 app.use(limiter);
 app.use(express.json());
@@ -148,139 +110,10 @@ async function runConnection() {
 runConnection().catch(console.dir);
 
 app.use("/api/stripe", StripeRouter);
-app.use("/api", AuthRouter);
+app.use("/api", UserRouter);
 app.use("/api", AdminRouter);
 app.use("/api", PasswordRouter);
-
-// ViEW ORDERS ROUTE
-app.get("/api/orders", async (req, res) => {
-  try {
-    const orders = await CoffeeModel.find({});
-    if (orders.length === 0) {
-      return res.json({ status: "error", error: "No Coffee Orders" });
-    } else {
-      return res.json({ status: "ok", orders: orders });
-    }
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ status: "error", error: "Error Fetching Orders" });
-  }
-});
-
-// CREATE ORDER ROUTE
-app.post("/api/orders", async (req, res) => {
-  const Ikhofi = coffeeObject(req);
-  const coffee = new CoffeeModel(Ikhofi);
-  try {
-    const saved = await coffee.save();
-    return res.json({ status: "ok", coffee: saved });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ status: "error", message: error.message });
-  }
-});
-
-// SEND TEXT and DELETE ORDER ROUTE
-app.post("/api/completeOrder", async (req, res) => {
-  const Ikhofi = coffeeObject(req);
-  try {
-    const data = await sendText(Ikhofi.number, Ikhofi.coffeeName);
-    if (data.response_code === "SUCCESS") {
-      await CoffeeModel.deleteOne(Ikhofi);
-      res.json({ status: "ok", message: "Coffee sent and deleted" });
-    } else {
-      res.status(400).json({ status: "error", message: "Failed to send coffee" });
-    }
-  } catch (error) {
-    logger.error(error);
-    res.status(500).json({ status: "error", message: error.message });
-  }
-});
-
-// UPDATE ORDER STATUS ROUTE
-app.post("/api/orders/updateStatus", async (req, res) => {
-  const { orderId, newStatus } = req.body;
-
-  try {
-    const updated = await CoffeeModel.updateOne({ _id: orderId }, { $set: { status: newStatus } });
-    if (updated.modifiedCount > 0) {
-      io.emit("order status update", { orderId, status: newStatus });
-      res.json({ status: "ok", message: "Order status updated" });
-    } else {
-      res.status(404).json({ status: "error", message: "Order not found" });
-    }
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: "error", message: error.message });
-  }
-});
-
-// register account route
-app.post("/api/register", async (req, res) => {
-  const data = await encrypt(req, 13);
-  try {
-    await User.create(data);
-    res.json({ status: "ok" });
-  } catch (err) {
-    res.json({ status: "error", error: "Duplicate email." });
-  }
-});
-
-// login route
-app.post(
-  "/api/login",
-  limiter,
-  [
-    body("email").isEmail().withMessage("InValid email format"),
-    body("password").isLength({ min: 6 }).withMessage("Password must be at least 6 characters"),
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.json({ status: "error", error: errors.array() });
-    }
-
-    try {
-      const userFound = await User.findOne({
-        email: req.body.email,
-      });
-
-      if (!userFound) {
-        res
-          .status(404)
-          .json({ status: "error", error: "No account found under these credentials" });
-      }
-      const data = await decrypt(req, userFound);
-      if (data.email && data.password) {
-        const token = jwt.sign(
-          {
-            name: userFound.name,
-            email: userFound.email,
-            number: userFound.number,
-          },
-          process.env.JWT_SECRET,
-          { expiresIn: process.env.TOKEN_EXPIRY || "7h" }
-        );
-        return res.json({ status: "ok", user: token });
-      } else {
-        return res.json({ status: "error", user: false });
-      }
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ status: "error", message: error.message });
-    }
-  }
-);
-
-// Admin dashboard route
-app.post(`/api/adminDashboard`, async (req, res) => {
-  try {
-    return res.json({ status: "ok" }, { passwordValid: true });
-  } catch (error) {
-    logger.error(`[Error]: ${error.message}`, { route: "/api/adminDashboard" });
-    res.status(500).json({ status: "error", message: "Internal Server Error" });
-  }
-});
+app.use("/api", OrderRouter);
 
 app.get("/", async (req, res) => {
   try {
