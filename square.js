@@ -1,6 +1,6 @@
-import dotenv from "dotenv";
+const dotenv = require("dotenv");
 dotenv.config({ path: "./config.env" });
-import { ApiError, Client, Environment } from "square";
+const { ApiError, Client, Environment } = require("square");
 BigInt.prototype.toJSON = function () {
   return this.toString();
 };
@@ -10,4 +10,4 @@ const client = new Client({
   accessToken: process.env.SQUARE_ACCESS_TOKEN,
 });
 
-export { client, ApiError };
+module.exports = { client, ApiError };

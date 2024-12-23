@@ -4,23 +4,18 @@ const express = require("express");
 const cors = require("cors");
 const http = require("http");
 const PORT = process.env.PORT || 1969;
-const jwt = require("jsonwebtoken");
 const { Server } = require("socket.io");
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const mongoose = require("mongoose");
-const User = require("./models/User");
-const { decrypt, encrypt } = require("./helperFunctions");
-const { body, validationResult } = require("express-validator");
 const mongoSanitize = require("express-mongo-sanitize");
-
 const helmet = require("helmet");
 const xxs = require("xss-clean");
 const hpp = require("hpp");
-const StripeRouter = require("./routes/stripe");
 const UserRouter = require("./routes/user");
 const AdminRouter = require("./routes/admin");
 const PasswordRouter = require("./routes/password");
 const OrderRouter = require("./routes/orders");
+const SquareRouter = require("./routes/square");
 const { initializePassword } = require("./passwordManager");
 const app = express();
 const server = http.createServer(app);
@@ -109,11 +104,11 @@ async function runConnection() {
 
 runConnection().catch(console.dir);
 
-app.use("/api/stripe", StripeRouter);
 app.use("/api", UserRouter);
 app.use("/api", AdminRouter);
 app.use("/api", PasswordRouter);
 app.use("/api", OrderRouter);
+app.use("/api", SquareRouter);
 
 app.get("/", async (req, res) => {
   try {
