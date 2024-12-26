@@ -30,6 +30,7 @@ const getCatalog = async (req, res) => {
   data.objects.map((obj) => {
     switch (obj.type) {
       case "ITEM":
+      // this is where we create the object we assign the name with the obj.id
         items[obj.id] = {
           id: obj.id,
           name: obj.itemData.name,
@@ -63,6 +64,7 @@ const getCatalog = async (req, res) => {
   // We use forEach here because we are adding the data directly there is no need to return a new array, we are just checkin
   data.relatedObjects.forEach((obj) => {
     if (obj.type === "TAX") {
+      // here is the object 
       taxes[obj.id] = {
         id: obj.id,
         name: obj.taxData.name,
