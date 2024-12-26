@@ -2,11 +2,9 @@ const PasswordModel = require("../models/Password");
 const { getCurrentPassword } = require("../passwordManager");
 
 const fetchPassword = async (req, res) => {
-  console.log(req.body);
   try {
     const { password } = req.body;
     const currentPwd = await getCurrentPassword();
-    console.log(currentPwd)
     if (password === currentPwd) {
       return res.json({ status: "ok", message: "Password matched" });
     } else {

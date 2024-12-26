@@ -6,8 +6,10 @@ BigInt.prototype.toJSON = function () {
 };
 
 const client = new Client({
-  environment: Environment.Sandbox,
-  accessToken: process.env.SQUARE_ACCESS_TOKEN,
+  environment: Environment.Production,
+  bearerAuthCredentials: {
+    accessToken: process.env.SQUARE_ACCESS_TOKEN,
+  },
 });
 
 module.exports = { client, ApiError };
