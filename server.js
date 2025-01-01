@@ -19,8 +19,7 @@ const SquareRouter = require("./routes/square");
 const { initializePassword } = require("./passwordManager");
 const app = express();
 const server = http.createServer(app);
-const { limiter } = require("./winston");
-const { logger } = require("./winston");
+const { limiter, logger } = require("./winston");
 
 app.use(limiter);
 app.use(express.json());

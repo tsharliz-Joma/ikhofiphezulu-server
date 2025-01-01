@@ -1,5 +1,6 @@
 const { ApiError, client: square } = require("../square");
 const { v4: uuidv4 } = require("uuid");
+const { formatPriceAUD } = require("../helperFunctions");
 require("dotenv").config({ path: "./config.env" });
 
 const getToken = async (req, res) => {
@@ -12,81 +13,130 @@ const getToken = async (req, res) => {
 };
 
 const getCatalog = async (req, res) => {
-  const response = await square.catalogApi.searchCatalogObjects({
-    objectTypes: ["ITEM", "CATEGORY", "IMAGE"], // Fetch both menu items and categories
-    includeRelatedObjects: true,
-    include_deleted_objects: false,
-  });
+  try {
+    const response = await square.catalogApi.searchCatalogObjects({
+      objectTypes: ["ITEM", "CATEGORY", "IMAGE"], // Fetch both menu items and categories
+      includeRelatedObjects: true,
+      include_deleted_objects: false,
+    });
 
-  const items = {};
-  const categories = {};
-  const images = {};
-  const taxes = {};
-  const modifiers = {};
+    const items = {};
+    const categories = {};
+    const images = {};
+    const taxes = {};
+    const modifiers = {};
 
-  const data = response.result;
+    const data = response.result;
+    console.log(data.objects[0].itemData.categories[0].id);
 
-  // Here we are creating a new object (mutating) by combining specific fields so we use map, we need a return value
-  data.objects.map((obj) => {
-    switch (obj.type) {
-      case "ITEM":
-        items[obj.id] = {
+    // Here we are creating a new object (mutating) by combining specific fields so we use map, we need a return value
+    data.objects.map((obj) => {
+      switch (obj.type) {
+        case "ITEM":
+          items[obj.itemData.name] = {
+            id: obj.id,
+            name: obj.itemData.name,
+            categoryId: obj.itemData.categories[0].id,
+            imageIds: obj.itemData.imageIds || [],
+            taxIds: obj.itemData.taxIds || [],
+            modifierListIds:
+              obj.itemData.modifierListInfo?.map((info) => info.modifierListId) || [],
+            variations: obj.itemData.variations,
+            price: obj.itemData.variations.map((item) => item.itemVariationData.priceMoney.amount),
+          };
+
+          break;
+
+        case "CATEGORY":
+          categories[obj.id] = {
+            id: obj.id,
+            name: obj.categoryData.name,
+            imageId: obj.categoryData.imageIds ? obj.categoryData.imageIds[0] : null,
+          };
+          break;
+
+        case "IMAGE":
+          images[obj.id] = {
+            id: obj.id,
+            name: obj.imageData.name,
+            url: obj.imageData.url,
+          };
+          break;
+
+        default:
+          break;
+      }
+    });
+
+    // We use forEach here because we are cçadding the data directly there is no need to return a new array, we are just checkin
+    data.relatedObjects.forEach((obj) => {
+      if (obj.type === "TAX") {
+        taxes[obj.id] = {
           id: obj.id,
-          name: obj.itemData.name,
-          categoryId: obj.itemData.reportingCategory.id,
-          imageIds: obj.itemData.imageIds || [],
-          taxIds: obj.itemData.taxIds || [],
-          modifierListIds: obj.itemData.modifierListInfo?.map((info) => info.modifierListId) || [],
-          variations: obj.itemData.variations,
+          name: obj.taxData.name,
+          percentage: obj.taxData.percentage,
         };
-        break;
-
-      case "CATEGORY":
-        categories[obj.id] = {
+      } else if (obj.type === "MODIFIER_LIST") {
+        modifiers[obj.id] = {
           id: obj.id,
-          name: obj.categoryData.name,
+          name: obj.modifierListData.name,
+          options: obj.modifierListData.modifiers?.map((item) => ({
+            id: item.id,
+            name: item.modifierData.name,
+            price: formatPriceAUD(item.modifierData.priceMoney.amount),
+          })),
         };
-        break;
+      }
+    });
 
-      case "IMAGE":
-        images[obj.id] = {
-          id: obj.id,
-          name: obj.imageData.name,
-          url: obj.imageData.url,
-        };
+    // I need to attach the images to their respective categories
+    Object.values(categories).forEach((category) => {
+      if (category.imageId && images[category.imageId]) {
+        category.image = images[category.imageId].url;
+      } else {
+        category.image = "";
+      }
+    });
 
-      default:
-        break;
-    }
-  });
+    Object.values(items).forEach((item) => {
+      // Attach category items
+      if (item.categoryId && categories[item.categoryId].id) {
+        // Initialize the items array if it doesn't exist
+        if (!categories[item.categoryId].items) {
+          categories[item.categoryId].items = [];
+        }
+        categories[item.categoryId].items.push(item);
+      }
 
-  // We use forEach here because we are adding the data directly there is no need to return a new array, we are just checkin
-  data.relatedObjects.forEach((obj) => {
-    if (obj.type === "TAX") {
-      taxes[obj.id] = {
-        id: obj.id,
-        name: obj.taxData.name,
-        percentage: obj.taxData.percentage,
-      };
-    } else if (obj.type === "MODIFIER_LIST") {
-      modifiers[obj.id] = {
-        id: obj.id,
-        name: obj.modifierListData.name,
-        modifiers: obj.modifierListData.modifiers,
-      };
-    }
-  });
+      // Attach images to items
+      if (item.imageIds && images[item.imageIds[0]]) {
+        item.image = images[item.imageIds].url;
+      }
 
-  return { items, categories, images, taxes, modifiers };
+      item.modifiers = item.modifierListIds
+        .map((modListId) => {
+          const modifier = modifiers[modListId];
+          return modifier
+            ? { id: modifier.id, name: modifier.name, options: modifier.options }
+            : null;
+        })
+        .filter(Boolean);
+    });
+
+    return res.json({ status: "ok", data: { items, categories, images, taxes, modifiers } });
+  } catch (error) {
+    console.error("Error fetching catalog:", error.message);
+    return res.status(500).json({ status: "error", message: error.message });
+  }
 };
 
 // Get specific item
 const getCatalogItem = async (req, res) => {
+  const itemId = req.params.id;
   try {
-    const response = await square.catalogApi.retrieveCatalogObject(null, true);
-    console.log(response.result);
+    const response = await square.catalogApi.retrieveCatalogObject(itemId, true);
   } catch (error) {
-    console.logg(error);
+    console.log(error);
   }
 };
 
@@ -104,4 +154,4 @@ const createPayment = async (req, res) => {
   }
 };
 
-module.exports = { createPayment, getCatalog };
+module.exports = { createPayment, getCatalog, getCatalogItem };

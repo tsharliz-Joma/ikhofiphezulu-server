@@ -1,6 +1,7 @@
 const { verify } = require("crypto");
 const User = require("./models/User");
 const bcrypt = require("bcryptjs");
+// const { bigint } = require("square/dist/types/schema");
 
 const coffeeObject = (req) => {
   const ikhofi = {
@@ -63,7 +64,6 @@ const decrypt = async (req, user) => {
 const verifyToken = (req, res, next) => {
   const token = req.header("admin-access-token");
   if (!token) return res.status(403).json({ status: "error", message: "Access Denied" });
-  console.log(token);
   try {
     const verified = jwt.verify(token, process.env.JWT_SECRET);
     req.user = verified;
@@ -73,4 +73,14 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-module.exports = { coffeeObject, encrypt, decrypt, verifyToken };
+const formatPriceAUD = (amountInCents) => {
+  const amount = typeof amountInCents === "bigint" ? Number(amountInCents) : amountInCents;
+
+  if (typeof amount !== "number" || isNaN(amount)) {
+    return "$0.00"; // Fallback for invalid values
+  }
+
+  return `$${(amount / 100).toFixed(2)}`;
+};
+
+module.exports = { coffeeObject, encrypt, decrypt, verifyToken, formatPriceAUD };
