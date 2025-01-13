@@ -27,7 +27,6 @@ const getCatalog = async (req, res) => {
     const modifiers = {};
 
     const data = response.result;
-    console.log(data.objects[0].itemData.categories[0].id);
 
     // Here we are creating a new object (mutating) by combining specific fields so we use map, we need a return value
     data.objects.map((obj) => {
@@ -36,13 +35,17 @@ const getCatalog = async (req, res) => {
           items[obj.itemData.name] = {
             id: obj.id,
             name: obj.itemData.name,
+            description: obj.itemData.descriptionPlaintext,
             categoryId: obj.itemData.categories[0].id,
             imageIds: obj.itemData.imageIds || [],
             taxIds: obj.itemData.taxIds || [],
             modifierListIds:
               obj.itemData.modifierListInfo?.map((info) => info.modifierListId) || [],
             variations: obj.itemData.variations,
-            price: obj.itemData.variations.map((item) => item.itemVariationData.priceMoney.amount),
+            basePriceMoney: {
+              amount: obj.itemData.variations[0].itemVariationData.priceMoney.amount,
+              currency: "AUD",
+            },
           };
 
           break;
@@ -81,6 +84,7 @@ const getCatalog = async (req, res) => {
           id: obj.id,
           name: obj.modifierListData.name,
           options: obj.modifierListData.modifiers?.map((item) => ({
+            catalogObjectId: item.id,
             id: item.id,
             name: item.modifierData.name,
             price: formatPriceAUD(item.modifierData.priceMoney.amount),
@@ -96,6 +100,22 @@ const getCatalog = async (req, res) => {
       } else {
         category.image = "";
       }
+    });
+
+    // Transform modifiers into an array format when attaching to items
+    Object.values(items).forEach((item) => {
+      item.modifiers = item.modifierListIds
+        .map((modListId) => {
+          const modifier = modifiers[modListId];
+          return modifier
+            ? {
+                catalogObjectId: modifier.id, // Modifier ID
+                name: modifier.name, // Modifier Name
+                quantity: "1", // Default quantity
+              }
+            : null;
+        })
+        .filter(Boolean); // Filter out any null values
     });
 
     Object.values(items).forEach((item) => {
@@ -123,8 +143,10 @@ const getCatalog = async (req, res) => {
         .filter(Boolean);
     });
 
+    // console.log(items.Latte.variations[0]);
     return res.json({ status: "ok", data: { items, categories, images, taxes, modifiers } });
   } catch (error) {
+    console.log(error.errors);
     console.error("Error fetching catalog:", error.message);
     return res.status(500).json({ status: "error", message: error.message });
   }
@@ -150,6 +172,7 @@ const createPayment = async (req, res) => {
     const response = await square.checkoutApi.createPaymentLink(order);
     return res.json({ status: "ok", data: response });
   } catch (error) {
+    console.log(error.errors);
     res.status(500).json({ status: "error", message: error.message });
   }
 };

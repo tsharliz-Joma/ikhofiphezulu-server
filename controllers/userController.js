@@ -1,6 +1,6 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
-const { encrypt } = require("../helperFunctions");
+const { encrypt, decrypt } = require("../helperFunctions");
 const { validationResult } = require("express-validator");
 
 const register = async (req, res) => {
@@ -25,13 +25,17 @@ const login = async (req, res) => {
     });
 
     if (!userFound) {
-      res.status(404).json({ status: "error", error: "No account found under these credentials" });
+      return res
+        .status(404)
+        .json({ status: "error", error: "No account found under these credentials" });
     }
+
     const data = await decrypt(req, userFound);
+
     if (data.email && data.password) {
       const token = jwt.sign(
         {
-          name: userFound.name,
+          name: userFound.user,
           email: userFound.email,
           number: userFound.number,
         },
@@ -43,7 +47,7 @@ const login = async (req, res) => {
       return res.json({ status: "error", user: false });
     }
   } catch (error) {
-    res.status(500).json({ status: "error", message: error.message });
+    res.status(500).json({ status: "error", error: error.message });
   }
 };
 

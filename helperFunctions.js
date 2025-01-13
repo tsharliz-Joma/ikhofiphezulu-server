@@ -48,17 +48,22 @@ const encrypt = async (req, len) => {
 };
 
 const decrypt = async (req, user) => {
-  const validatedInfo = {
-    email: req.body.email,
-    password: req.body.password,
-    async compareValues() {
-      return {
-        email: await bcrypt.compare(this.email, user.hashedEmail),
-        password: await bcrypt.compare(this.password, user.password),
-      };
-    },
-  };
-  return await validatedInfo.compareValues();
+  if (!req.body.password) {
+    throw new Error("Missing password");
+  }
+
+  if (!req.body.email) {
+    throw new Error("Missing email");
+  }
+
+  try {
+    const pwdIsMatch = bcrypt.compare(req.body.password, `${user.pwd}`);
+    const email = req.body.email ? true : false;
+    return { password: pwdIsMatch, email: email };
+  } catch (error) {
+    console.error("Decryption Error", error);
+    throw new Error("Password decryption failed");
+  }
 };
 
 const verifyToken = (req, res, next) => {
