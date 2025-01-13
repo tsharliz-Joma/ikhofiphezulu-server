@@ -1,6 +1,7 @@
 const { verify } = require("crypto");
 const User = require("./models/User");
 const bcrypt = require("bcryptjs");
+// const { bigint } = require("square/dist/types/schema");
 
 const coffeeObject = (req) => {
   const ikhofi = {
@@ -47,23 +48,27 @@ const encrypt = async (req, len) => {
 };
 
 const decrypt = async (req, user) => {
-  const validatedInfo = {
-    email: req.body.email,
-    password: req.body.password,
-    async compareValues() {
-      return {
-        email: await bcrypt.compare(this.email, user.hashedEmail),
-        password: await bcrypt.compare(this.password, user.password),
-      };
-    },
-  };
-  return await validatedInfo.compareValues();
+  if (!req.body.password) {
+    throw new Error("Missing password");
+  }
+
+  if (!req.body.email) {
+    throw new Error("Missing email");
+  }
+
+  try {
+    const pwdIsMatch = bcrypt.compare(req.body.password, `${user.pwd}`);
+    const email = req.body.email ? true : false;
+    return { password: pwdIsMatch, email: email };
+  } catch (error) {
+    console.error("Decryption Error", error);
+    throw new Error("Password decryption failed");
+  }
 };
 
 const verifyToken = (req, res, next) => {
   const token = req.header("admin-access-token");
   if (!token) return res.status(403).json({ status: "error", message: "Access Denied" });
-  console.log(token);
   try {
     const verified = jwt.verify(token, process.env.JWT_SECRET);
     req.user = verified;
@@ -73,4 +78,14 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-module.exports = { coffeeObject, encrypt, decrypt, verifyToken };
+const formatPriceAUD = (amountInCents) => {
+  const amount = typeof amountInCents === "bigint" ? Number(amountInCents) : amountInCents;
+
+  if (typeof amount !== "number" || isNaN(amount)) {
+    return "$0.00"; // Fallback for invalid values
+  }
+
+  return `$${(amount / 100).toFixed(2)}`;
+};
+
+module.exports = { coffeeObject, encrypt, decrypt, verifyToken, formatPriceAUD };

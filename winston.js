@@ -12,7 +12,7 @@ const logger = winston.createLogger({
 
 const limiter = rateLimit({
   windowMs: 10 * 60 * 1000,
-  max: 100,
+  max: 300,
   message: "Too many requests from this IP, please try again after 30 minutes",
   handler: (req, res) => {
     logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
@@ -25,7 +25,7 @@ const limiter = rateLimit({
 
 const adminLimiter = rateLimit({
   windowMs: 10 * 60 * 2000, // 10 minutes
-  max: 5, // Limit each IP to 5 login attempts per window
+  max: 50, // Limit each IP to 5 login attempts per window
   message: "Too many login attempts. Please try again later.",
   handler: (req, res) => {
     logger.warn(`Rate limit exceeded for IP: ${req.ip}`);

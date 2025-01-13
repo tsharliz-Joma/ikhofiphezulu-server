@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const Password = require("./models/Password");
 const cron = require("node-cron");
 
+// Generate random password
 const generatePassword = (length = 16) => {
   return crypto.randomBytes(length).toString("hex");
 };
