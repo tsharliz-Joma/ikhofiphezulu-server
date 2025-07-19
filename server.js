@@ -39,7 +39,7 @@ app.use((req, res, next) => {
 const io = new Server(server, {
   cors: {
     origin: [
-      "https://coffeeup.web.app",
+      "https://coffeeup.web.app/",
       "https://ikhofiphezulu-server-19652a0dabe7.herokuapp.com/",
       "http://localhost:3000",
     ],
