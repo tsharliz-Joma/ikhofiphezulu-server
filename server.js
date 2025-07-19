@@ -129,7 +129,7 @@ app.use((err, req, res, next) => {
   });
   res.status(err.statusCode || 500).json({
     status: "error",
-    message: err.isOperational ? err.message : "Somthing went wrong",
+    message: err.isOperational ? err.message : "Something went wrong",
   });
 });
 
