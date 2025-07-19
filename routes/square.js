@@ -4,7 +4,7 @@ const { createPayment, getCatalog, getCatalogItem } = require("../controllers/sq
 const SquareRouter = express.Router();
 
 SquareRouter.get("/catalog/:id", getCatalogItem);
-SquareRouter.post("/catalog/search", getCatalog);
+SquareRouter.post("/catalog/list", getCatalog);
 SquareRouter.post("/square-pay", createPayment);
 
 module.exports = SquareRouter;
