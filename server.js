@@ -1,11 +1,11 @@
-require("dotenv").config({ path: "./config.env" });
-require("dotenv").config({ path: "./env.dev" });
+require("dotenv").config({path: "./config.env"});
+require("dotenv").config({path: "./env.dev"});
 const express = require("express");
 const cors = require("cors");
 const http = require("http");
 const PORT = process.env.PORT || 1969;
-const { Server } = require("socket.io");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const {Server} = require("socket.io");
+const {MongoClient, ServerApiVersion} = require("mongodb");
 const mongoose = require("mongoose");
 const mongoSanitize = require("express-mongo-sanitize");
 const helmet = require("helmet");
@@ -16,14 +16,15 @@ const AdminRouter = require("./routes/admin");
 const PasswordRouter = require("./routes/password");
 const OrderRouter = require("./routes/orders");
 const SquareRouter = require("./routes/square");
-const { initializePassword } = require("./passwordManager");
+const {initializePassword} = require("./passwordManager");
 const app = express();
 const server = http.createServer(app);
-const { limiter, logger } = require("./winston");
+const SANDBOX_MODE = process.env.SANDBOX_MODE === "true";
+const {limiter, logger} = require("./winston");
 
 app.use(limiter);
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({extended: true}));
 app.use(mongoSanitize()); // Prevent NoSQL injection
 app.use(xxs()); // Prevent XSS attacks
 app.use(helmet()); // Secure HTTP headers
@@ -92,8 +93,10 @@ async function runConnection() {
     // connect client to the server
     await mongoClient.connect();
     // send a ping to confirm success
-    await mongoClient.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You Connected successfully to MongoDb");
+    await mongoClient.db("admin").command({ping: 1});
+    console.log(
+      "Pinged your deployment. You Connected successfully to MongoDb",
+    );
   } finally {
     // Ensure the client will close when finished or an error occurs
     // I have to turn this off, it causes and error with the collection.watch
