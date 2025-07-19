@@ -40,7 +40,7 @@ const io = new Server(server, {
   cors: {
     origin: [
       "https://ikhofiphezulu.web.app",
-      "https://ikhofiphezulu-server-19652a0dabe7.herokuapp.com/",
+      "https://ikhofiphezulu-server-19652a0dabe7.herokuapp.com/*",
       "http://localhost:3000",
     ],
     methods: ["GET", "POST"],
