@@ -157,6 +157,7 @@ const getCatalogItem = async (req, res) => {
   const itemId = req.params.id;
   try {
     const response = await square.catalogApi.retrieveCatalogObject(itemId, true);
+    return response?.data
   } catch (error) {
     console.log(error);
   }
