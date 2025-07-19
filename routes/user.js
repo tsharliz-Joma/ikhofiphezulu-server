@@ -1,7 +1,7 @@
 const express = require("express");
 const { register, login } = require("../controllers/userController");
 const { body } = require("express-validator");
-const { limiter } = require("../winston.js");
+const { limiter } = require("../lib/winston.js");
 const userRouter = express.Router();
 
 userRouter.use(limiter);

@@ -1,6 +1,6 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
-const { encrypt, decrypt } = require("../helperFunctions");
+const { encrypt, decrypt } = require("../lib/helperFunctions");
 const { validationResult } = require("express-validator");
 
 const register = async (req, res) => {

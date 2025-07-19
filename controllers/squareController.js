@@ -1,6 +1,6 @@
-const { ApiError, client: square } = require("../square");
+const { ApiError, client: square } = require("../lib/square");
 const { v4: uuidv4 } = require("uuid");
-const { formatPriceAUD } = require("../helperFunctions");
+const { formatPriceAUD } = require("../lib/helperFunctions");
 require("dotenv").config({ path: "./config.env" });
 
 const getToken = async (req, res) => {

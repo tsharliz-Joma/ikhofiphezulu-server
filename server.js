@@ -16,11 +16,10 @@ const AdminRouter = require("./routes/admin");
 const PasswordRouter = require("./routes/password");
 const OrderRouter = require("./routes/orders");
 const SquareRouter = require("./routes/square");
-const {initializePassword} = require("./passwordManager");
+const { initializePassword } = require("./lib/passwordManager");
 const app = express();
 const server = http.createServer(app);
-const SANDBOX_MODE = process.env.SANDBOX_MODE === "true";
-const {limiter, logger} = require("./winston");
+const { limiter, logger } = require("./lib/winston");
 
 app.use(limiter);
 app.use(express.json());

@@ -1,7 +1,7 @@
 const express = require("express");
 const { adminLogin } = require("../controllers/adminController");
 const { body } = require("express-validator");
-const { adminLimiter } = require("../winston.js");
+const { adminLimiter } = require("../lib/winston.js");
 const AdminRouter = express.Router();
 
 AdminRouter.use(adminLimiter);

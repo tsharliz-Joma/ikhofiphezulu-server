@@ -1,5 +1,5 @@
 const PasswordModel = require("../models/Password");
-const { getCurrentPassword } = require("../passwordManager");
+const { getCurrentPassword } = require("../lib/passwordManager");
 
 const fetchPassword = async (req, res) => {
   try {
