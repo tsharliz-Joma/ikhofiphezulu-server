@@ -16,10 +16,10 @@ const AdminRouter = require("./routes/admin");
 const PasswordRouter = require("./routes/password");
 const OrderRouter = require("./routes/orders");
 const SquareRouter = require("./routes/square");
-const { initializePassword } = require("./lib/passwordManager");
+const {initializePassword} = require("./lib/passwordManager");
 const app = express();
 const server = http.createServer(app);
-const { limiter, logger } = require("./lib/winston");
+const {limiter, logger} = require("./lib/winston");
 
 app.use(limiter);
 app.use(express.json());
@@ -110,6 +110,7 @@ app.use("/api", AdminRouter);
 app.use("/api", PasswordRouter);
 app.use("/api", OrderRouter);
 app.use("/api", SquareRouter);
+
 
 app.get("/", async (req, res) => {
   try {

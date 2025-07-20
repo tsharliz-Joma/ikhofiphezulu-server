@@ -1,7 +1,7 @@
-const { ApiError, client: square } = require("../lib/square");
-const { v4: uuidv4 } = require("uuid");
-const { formatPriceAUD } = require("../lib/helperFunctions");
-require("dotenv").config({ path: "./config.env" });
+const {ApiError, client: square} = require("../lib/square");
+const {v4: uuidv4} = require("uuid");
+const {formatPriceAUD} = require("../lib/helperFunctions");
+require("dotenv").config({path: "./config.env"});
 
 const getToken = async (req, res) => {
   const response = await client.oAuthApi.obtainToken({
@@ -40,10 +40,13 @@ const getCatalog = async (req, res) => {
             imageIds: obj.itemData.imageIds || [],
             taxIds: obj.itemData.taxIds || [],
             modifierListIds:
-              obj.itemData.modifierListInfo?.map((info) => info.modifierListId) || [],
+              obj.itemData.modifierListInfo?.map(
+                (info) => info.modifierListId,
+              ) || [],
             variations: obj.itemData.variations,
             basePriceMoney: {
-              amount: obj.itemData.variations[0].itemVariationData.priceMoney.amount,
+              amount:
+                obj.itemData.variations[0].itemVariationData.priceMoney.amount,
               currency: "AUD",
             },
           };
@@ -54,7 +57,9 @@ const getCatalog = async (req, res) => {
           categories[obj.id] = {
             id: obj.id,
             name: obj.categoryData.name,
-            imageId: obj.categoryData.imageIds ? obj.categoryData.imageIds[0] : null,
+            imageId: obj.categoryData.imageIds
+              ? obj.categoryData.imageIds[0]
+              : null,
           };
           break;
 
@@ -137,18 +142,21 @@ const getCatalog = async (req, res) => {
         .map((modListId) => {
           const modifier = modifiers[modListId];
           return modifier
-            ? { id: modifier.id, name: modifier.name, options: modifier.options }
+            ? {id: modifier.id, name: modifier.name, options: modifier.options}
             : null;
         })
         .filter(Boolean);
     });
 
     // console.log(items.Latte.variations[0]);
-    return res.json({ status: "ok", data: { items, categories, images, taxes, modifiers } });
+    return res.json({
+      status: "ok",
+      data: {items, categories, images, taxes, modifiers},
+    });
   } catch (error) {
     console.log(error.errors);
     console.error("Error fetching catalog:", error.message);
-    return res.status(500).json({ status: "error", message: error.message });
+    return res.status(500).json({status: "error", message: error.message});
   }
 };
 
@@ -156,8 +164,11 @@ const getCatalog = async (req, res) => {
 const getCatalogItem = async (req, res) => {
   const itemId = req.params.id;
   try {
-    const response = await square.catalogApi.retrieveCatalogObject(itemId, true);
-    return response?.data
+    const response = await square.catalogApi.retrieveCatalogObject(
+      itemId,
+      true,
+    );
+    return response?.data;
   } catch (error) {
     console.log(error);
   }
@@ -171,11 +182,11 @@ const createPayment = async (req, res) => {
       order: req.body,
     };
     const response = await square.checkoutApi.createPaymentLink(order);
-    return res.json({ status: "ok", data: response });
+    return res.json({status: "ok", data: response});
   } catch (error) {
     console.log(error.errors);
-    res.status(500).json({ status: "error", message: error.message });
+    res.status(500).json({status: "error", message: error.message});
   }
 };
 
-module.exports = { createPayment, getCatalog, getCatalogItem };
+module.exports = {createPayment, getCatalog, getCatalogItem};

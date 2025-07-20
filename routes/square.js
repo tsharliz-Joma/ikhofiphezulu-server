@@ -7,4 +7,5 @@ SquareRouter.get("/catalog/:id", getCatalogItem);
 SquareRouter.post("/catalog", getCatalog);
 SquareRouter.post("/square-pay", createPayment);
 
+
 module.exports = SquareRouter;
