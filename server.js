@@ -40,6 +40,7 @@ const io = new Server(server, {
   cors: {
     origin: [
       "https://coffeeup.web.app",
+      "https://coffeeup-2341e.web.app",
       "https://ikhofiphezulu-server-19652a0dabe7.herokuapp.com",
       "http://localhost:3000",
     ],
@@ -110,7 +111,6 @@ app.use("/api", AdminRouter);
 app.use("/api", PasswordRouter);
 app.use("/api", OrderRouter);
 app.use("/api", SquareRouter);
-
 
 app.get("/", async (req, res) => {
   try {
